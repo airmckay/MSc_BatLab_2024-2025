@@ -1,0 +1,216 @@
+---
+title: "ECOL340_PrepDataset"
+output: html_document
+date: "2024-09-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## README
+
+**Project and data** The intentiopn of this R Markdown is to prepare a dataset that Master Students of BatLab Norway part of the 2024-2025 academic year can use for ECOL340 exercises in the autumn of 2024. These datasets are made up of bat acoustic data automatically processed by Kaleidoscope Pro (v.5.6.3) with the Bats of Europe Classifier (v.5.4.0) modified to only include species included on the Norwegian National Red List (from CM-03, CM-07 (coastal monitoring sites), ST-01, and ST-02 (wind turbine sites at Stigafjellet wind farm) collected during the 2024 field season. Each observation (row) represents a 5 second (a few may be slightly shorter) acoustic recording (bat pass - though it may not contain a bat at all i.e., a noise file yet to be identified). Recordings that the classifier identifies as noise will be removed and treated as non-bat passes. We will then assume that the rest of the recordings do include bats, though false positives are likely without a manual acoustic analysis to verify these classifications. Mis-identification of bat species is also very likely and so this data cannot be treated as actual bat observations without further analysis. The objective of preparing this data is to give masters students experience working with bat acoustic datasets. 
+
+
+## Prepare work space
+```{r}
+
+library(data.table)
+library(tidyverse)
+library(beepr)
+library(lubridate)
+library(purrr)
+library(janitor)
+library(renv)
+library(stringr)
+library(beepr)
+
+
+getwd()
+# "C:/Users/apmc/OneDrive - Norwegian University of Life Sciences/Documents/1. PhD_Main/GitHub_link/MSc_BatLab_2024-2025/MSc_BatLab_2024-2025"
+
+```
+
+
+
+```{r}
+
+# Specify directories
+# folders where csv files are all in for each site
+inputCM03 <- "P:/SW_CoastalMonitoring/Data_process_auto_2024/CM-03/KPRO_08.08.2024_CM-03" 
+inputCM22 <-"P:/SW_CoastalMonitoring/Data_process_auto_2024/CM-22/KPRO_13.08.2024_CM-22" 
+inputST01 <-"P:/Noctur/DataCollection_2024/Acoustics/Stigafjellet/ST-01/WAV/KPRO_12.08.2024_ST-01" 
+inputST02 <-"P:/Noctur/DataCollection_2024/Acoustics/Stigafjellet/ST-02/WAV/KPRO_12.08.2024_ST-02" 
+
+
+output <- "C:/Users/apmc/OneDrive - Norwegian University of Life Sciences/BatLab Norway/Field Work 2024/ForMastersStudents"
+
+file.name <- "ECOL340_CombineAutoIDs"
+
+todays_date <- Sys.Date()
+ 
+dir.name <- str_c(output,"/", file.name, "_", todays_date)
+dir.name
+ 
+output_today <- dir.name
+output_today
+
+dir.create(output_today)
+output_today
+
+# "C:/Users/apmc/OneDrive - Norwegian University of Life Sciences/BatLab Norway/Field Work 2024/ForMastersStudents/ECOL340_CombineAutoIDs_2024-09-13"
+
+```
+
+
+```{r}
+
+
+CM03 <- list.files(path=inputCM03, pattern="id.csv", recursive = FALSE)
+CM03
+
+CM22 <- list.files(path=inputCM22, pattern="id.csv", recursive = FALSE)
+CM22
+
+ST01 <- list.files(path=inputST01, pattern="id.csv", recursive = FALSE)
+ST01
+
+ST02 <- list.files(path=inputST02, pattern="id.csv", recursive = FALSE)
+ST02
+
+# #To read all your csv files and create a list with all these elements
+
+## CM-03
+knitr::opts_chunk$set(
+    root.dir = setwd(rprojroot::find_rstudio_root_file(inputCM03)))
+getwd()
+
+CM03_data <- lapply(CM03, read.csv)
+
+## CM-22
+knitr::opts_chunk$set(
+    root.dir = setwd(rprojroot::find_rstudio_root_file(inputCM22)))
+getwd()
+
+CM22_data <- lapply(CM22, read.csv)
+
+## ST-01
+knitr::opts_chunk$set(
+    root.dir = setwd(rprojroot::find_rstudio_root_file(inputST01)))
+getwd()
+
+ST01_data <- lapply(ST01, read.csv)
+
+## ST-02
+knitr::opts_chunk$set(
+    root.dir = setwd(rprojroot::find_rstudio_root_file(inputST02)))
+getwd()
+
+ST02_data <- lapply(ST02, read.csv)
+
+
+
+#To add the name of each csv in the list
+names(CM03_data) <- gsub("//.csv$", "", CM03)
+names(CM22_data) <- gsub("//.csv$", "", CM22)
+names(ST01_data) <- gsub("//.csv$", "", ST01)
+names(ST02_data) <- gsub("//.csv$", "", ST02)
+
+#To create one single dataframe with all single dataframes
+## Do yourself a favor - ADD A SITE COLUMN HERE! 
+big_CM03 <- rbindlist(CM03_data, fill = TRUE)
+big_CM03$Site <- "CM-03" 
+dim(big_CM03)
+# 20430    45
+names(big_CM03)
+
+
+big_CM22 <- rbindlist(CM22_data, fill = TRUE)
+big_CM22$Site <- "CM-22" 
+dim(big_CM22)
+# 5948   45
+names(big_CM22)
+
+
+big_ST01 <- rbindlist(ST01_data, fill = TRUE)
+big_ST01$Site <- "ST-01" 
+dim(big_ST01)
+# 1352   45
+names(big_ST01)
+
+big_ST02 <- rbindlist(ST02_data, fill = TRUE)
+big_ST02$Site <- "ST-02" 
+dim(big_ST02)
+# 1191   45
+names(big_ST02)
+
+### I will now combine all of these into one large csv file but because of the differences in column numbers and also that these will each be organized separately, I am not sure how useful that CSV file is ... 
+
+alist = list(big_CM03, big_CM22, 
+             big_ST01, big_ST02)
+
+big_data <- rbindlist(alist, fill=TRUE)
+dim(big_data)
+# 28921    45
+
+# ## Uncleaned csv file of all AUTOIDS combined
+#write.csv(big_data, file = file.path(output_today, "MSc_ECOL340_Subset_AllProcessedBatDataCombined.csv")) 
+# # exported 13.09.2024
+
+
+```
+
+## Now create student specific subsets 
+
+```{r}
+
+df <- big_data %>% mutate(Site = factor(Site), AUTO.ID. = factor(AUTO.ID.)) 
+summary(df$Site)
+# CM-03  CM-22 ST-01 ST-02 
+# 20430  5948  1352  1191
+
+summary(df$AUTO.ID.) # No NAs, lots of Noise! 
+# I will leave the Noise files in for now but you (the students) should remove them at some point if you want to use this to look at "bat" data. 
+
+## for Sara
+Sdf <- df %>% filter(Site %in% c("CM-03", "CM-22")) %>% droplevels()
+
+summary(Sdf$Site)
+# CM-03 CM-22 
+# 20430  5948 
+
+summary(Sdf$AUTO.ID.)
+
+#write.csv(Sdf, file = file.path(output_today, "SARA_MSc_ECOL340_Subset_AllProcessedBatDataCombined.csv"))
+# 13.09.2024
+
+## for Ylva
+Ydf <- df %>% filter(Site %in% c("ST-01", "ST-02")) %>% droplevels()
+
+summary(Ydf$Site)
+# ST-01 ST-02 
+#  1352  1191 
+
+summary(Ydf$AUTO.ID.)
+
+# write.csv(Ydf, file = file.path(output_today, "YLVA_MSc_ECOL340_Subset_AllProcessedBatDataCombined.csv"))
+# 13.09.2024
+
+
+## for Benedikte
+Bdf <- df %>% filter(Site %in% c("ST-01", "CM-03")) %>% droplevels()
+
+summary(Bdf$Site)
+# ST-01 ST-02 
+#  1352  1191
+
+summary(Bdf$AUTO.ID.)
+
+# write.csv(Bdf, file = file.path(output_today, "BENEDIKTE_MSc_ECOL340_Subset_AllProcessedBatDataCombined.csv"))
+# 13.09.2024
+
+```
+
+That's all for now
